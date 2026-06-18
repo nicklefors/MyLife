@@ -9,6 +9,10 @@ class Settings(ndb.Model):
 	email_hour = ndb.IntegerProperty(default=20)
 	include_old_post_in_entry = ndb.BooleanProperty(default=True)
 	dropbox_access_token = ndb.StringProperty(required=False)
+	dropbox_app_key = ndb.StringProperty(required=False)
+	dropbox_app_secret = ndb.StringProperty(required=False)
+	dropbox_refresh_token = ndb.StringProperty(required=False)
+	dropbox_access_token_expires = ndb.DateTimeProperty(required=False)
 	dropbox_last_backup = ndb.DateTimeProperty(required=False)
 	blobstore_migration_done=ndb.BooleanProperty(default=False)
 	

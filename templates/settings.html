@@ -36,12 +36,35 @@
 		<input type="radio" name="include-old-entry" value="yes"{%if include_old_post_in_entry%} checked="checked"{%endif%}/ ><span class="radio">Yes</span>
 		<input type="radio" name="include-old-entry" value="no"{%if not include_old_post_in_entry%} checked="checked"{%endif%} /><span class="radio">No</span>
 
-		<label for="dropbox-access-token">Dropbox Access Token</label>
-		<input type="password" name="dropbox-access-token" id="dropbox-accesss-token" value="{{dropbox_access_token}}" />
+		<label for="dropbox-app-key">Dropbox App Key</label>
+		<input type="text" name="dropbox-app-key" id="dropbox-app-key" value="{{dropbox_app_key}}" />
+
+		<label for="dropbox-app-secret">Dropbox App Secret</label>
+		<input type="password" name="dropbox-app-secret" id="dropbox-app-secret" value="" placeholder="{%if dropbox_secret_set%}(unchanged){%endif%}" />
+
 		<p id="dropbox-explanation">
-			If you add a Dropbox Access Token your entries and photos will automatically be backed up to Dropbox every night.
-			You must <a target="_blank" href="http://einaregilsson.com/mylife-backup-to-dropbox/">set up your own Dropbox app to do this.</a>
+			If you connect Dropbox your entries and photos will automatically be backed up there every night.
+			You must <a target="_blank" href="http://einaregilsson.com/mylife-backup-to-dropbox/">set up your own Dropbox app</a>
+			with the <code>files.content.write</code>, <code>files.content.read</code> and <code>files.metadata.read</code> permissions,
+			then enter its app key and secret above.
+			{%if dropbox_authorize_url%}
+				<br><br>
+				1. <a target="_blank" href="{{dropbox_authorize_url}}">Authorize MyLife with Dropbox</a>, approve access, and copy the code Dropbox shows you.<br>
+				2. Paste that code below and save.
+			{%else%}
+				<br><br>Enter your app key and secret and click Save to get an authorization link.
+			{%endif%}
 		</p>
+
+		<label for="dropbox-auth-code">Dropbox Authorization Code</label>
+		<input type="text" name="dropbox-auth-code" id="dropbox-auth-code" value="" autocomplete="off" />
+
+		{%if dropbox_connected%}
+		<p class="dropbox-status">&#10003; Connected to Dropbox.{%if dropbox_last_backup%} Last backup: {{dropbox_last_backup.strftime('%Y-%m-%d %H:%M')}} UTC.{%endif%}</p>
+		{%endif%}
+		{%if dropbox_message%}
+		<p class="dropbox-status">{{dropbox_message}}</p>
+		{%endif%}
 		<div class="button-container">
 			<button type="submit" class="save">Save settings</button>
 		</div>

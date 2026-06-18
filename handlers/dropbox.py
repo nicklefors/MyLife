@@ -6,6 +6,58 @@ import logging, traceback, webapp2, json, datetime, filestore, io
 import requests
 from errorhandling import log_error
 
+DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token'
+
+
+def _apply_token_response(settings, data):
+	"""Persist an /oauth2/token response onto the Settings entity (caller puts())."""
+	settings.dropbox_access_token = data['access_token']
+	expires_in = data.get('expires_in', 14400)
+	settings.dropbox_access_token_expires = datetime.datetime.now() + datetime.timedelta(seconds=expires_in)
+	if data.get('refresh_token'):
+		settings.dropbox_refresh_token = data['refresh_token']
+
+
+def exchange_code(settings, code):
+	"""Exchange a one-time authorization code for a refresh token + access token."""
+	resp = requests.post(DROPBOX_TOKEN_URL, data={
+		'grant_type': 'authorization_code',
+		'code': code,
+		'client_id': settings.dropbox_app_key,
+		'client_secret': settings.dropbox_app_secret,
+	})
+	if resp.status_code != 200:
+		raise Exception('Dropbox code exchange failed. Status: %s, body: %s' % (resp.status_code, resp.text))
+	_apply_token_response(settings, resp.json())
+	settings.put()
+
+
+def get_access_token(settings):
+	"""Return a usable Dropbox bearer token.
+
+	Refresh mode (refresh token + app key/secret present): reuse the cached
+	short-lived access token while it is still valid, otherwise mint a new one
+	with the refresh token. Legacy mode: return the stored long-lived token.
+	"""
+	if settings.dropbox_refresh_token and settings.dropbox_app_key and settings.dropbox_app_secret:
+		now = datetime.datetime.now()
+		if (settings.dropbox_access_token and settings.dropbox_access_token_expires
+				and settings.dropbox_access_token_expires > now + datetime.timedelta(minutes=5)):
+			return settings.dropbox_access_token
+		resp = requests.post(DROPBOX_TOKEN_URL, data={
+			'grant_type': 'refresh_token',
+			'refresh_token': settings.dropbox_refresh_token,
+			'client_id': settings.dropbox_app_key,
+			'client_secret': settings.dropbox_app_secret,
+		})
+		if resp.status_code != 200:
+			raise Exception('Dropbox token refresh failed. Status: %s, body: %s' % (resp.status_code, resp.text))
+		_apply_token_response(settings, resp.json())
+		settings.put()
+		return settings.dropbox_access_token
+	return settings.dropbox_access_token
+
+
 class DropboxBackupHandler(webapp2.RequestHandler):
 	def get(self):
 		images_total = 0
@@ -14,9 +66,11 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 			self.response.headers['Content-Type'] = 'text/plain'
 			settings = Settings.get()
 
-			if not settings.dropbox_access_token:
-				self.log('No access token available, no backup will be performed.')
+			if not (settings.dropbox_refresh_token or settings.dropbox_access_token):
+				self.log('No Dropbox credentials configured, no backup will be performed.')
 				return
+
+			access_token = get_access_token(settings)
 
 
 			posts = [p for p in Post.query().order(Post.date).fetch()]
@@ -29,13 +83,13 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 				post_text.write(p.text.replace('\r\n', '\n').replace('\n', '\r\n').rstrip())
 				post_text.write('\r\n\r\n')
 
-			result = self.put_file(settings.dropbox_access_token, 'MyLife.txt', post_text.getvalue().encode('utf-8'))
+			result = self.put_file(access_token, 'MyLife.txt', post_text.getvalue().encode('utf-8'))
 			post_text.close()
 			self.log('Backed up posts. Revision: %s' % result['rev'])
 
 			self.log('Fetching Dropbox file list')
 			
-			files_in_dropbox = self.get_dropbox_filelist(settings.dropbox_access_token)
+			files_in_dropbox = self.get_dropbox_filelist(access_token)
 			
 			self.log('Got %s files from Dropbox' % len(files_in_dropbox))
 
@@ -57,7 +111,7 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 			for img in images:
 				self.log('Backing up %s' % img.filename)
 				bytes = filestore.read(img.original_size_key)
-				result = self.put_file(settings.dropbox_access_token, img.filename, bytes)
+				result = self.put_file(access_token, img.filename, bytes)
 				self.log('Backed up %s. Revision: %s' % (img.filename, result['rev']))
 				img.backed_up_in_dropbox = True
 				img.put()
