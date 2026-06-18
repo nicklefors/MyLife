@@ -34,7 +34,9 @@
 	font-size:12px;
 }
 
-#dropbox-accesss-token {
+#dropbox-app-key,
+#dropbox-app-secret,
+#dropbox-auth-code {
 	width:400px;
 }
 
@@ -42,6 +44,56 @@
 	font-size:12px;
 	width:400px;
 	margin:auto;
+}
+
+.dropbox-heading {
+	margin-top:35px;
+	margin-bottom:5px;
+}
+
+.dropbox-steps-heading {
+	font-size:13px;
+	font-weight:bold;
+	width:400px;
+	margin:20px auto 5px auto;
+	text-align:left;
+}
+
+.dropbox-steps {
+	font-size:12px;
+	width:380px;
+	margin:5px auto;
+	padding-left:20px;
+	text-align:left;
+	line-height:18px;
+}
+
+.dropbox-steps li {
+	margin-bottom:6px;
+}
+
+.dropbox-steps code {
+	font-size:11px;
+	background:#f0f0f0;
+	padding:1px 3px;
+	border-radius:2px;
+}
+
+.dropbox-note {
+	font-size:12px;
+	width:400px;
+	margin:10px auto;
+	color:#666;
+}
+
+.dropbox-status {
+	font-size:13px;
+	width:400px;
+	margin:12px auto;
+}
+
+.dropbox-connected {
+	color:green;
 }
 
 .save-message {
