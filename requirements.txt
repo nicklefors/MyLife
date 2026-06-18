@@ -1,7 +1,5 @@
 appengine-python-standard==2.0.1
 gunicorn==23.0.0
 webapp2==3.0.0b1
-WebOb>=1.8,<2
-six>=1.16
 Jinja2>=3.1,<4
 requests>=2.31,<3

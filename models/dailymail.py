@@ -1,5 +1,5 @@
 import traceback, random
-from engine.google import mail
+from google.appengine.api import mail
 import datetime, uuid, re, logging, os
 from models.slug import Slug
 from models.post import Post

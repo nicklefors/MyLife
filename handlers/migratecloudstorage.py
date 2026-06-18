@@ -1,7 +1,8 @@
-import webapp2, time, logging, json, traceback
+import webapp2, logging, json, traceback
 from models.migratetask import MigrateTask
 from models.userimage import UserImage
-from engine.google import ndb, taskqueue
+from google.appengine.ext import ndb
+from google.appengine.api import taskqueue
 from errorhandling import log_error
 
 class MigrateStartHandler(webapp2.RequestHandler):
@@ -11,9 +12,9 @@ class MigrateStartHandler(webapp2.RequestHandler):
 		task.put()
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/migrate/run', params={"task":task.key.urlsafe_str()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/migrate/run', params={"task":task.key.urlsafe().decode()}, retry_options=retry_options)
 		queue_task.add()
-		result = {"message" : "Migration queued and will start in a few seconds...", "id" : task.key.urlsafe_str()}
+		result = {"message" : "Migration queued and will start in a few seconds...", "id" : task.key.urlsafe().decode()}
 		self.response.headers['Content-Type'] = "application/json"
 		self.response.write(json.dumps(result))
 

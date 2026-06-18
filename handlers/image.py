@@ -1,4 +1,4 @@
-from engine.google import blobstore_handlers
+import blobstore_handlers
 import filestore
 from models.userimage import UserImage
 

@@ -1,4 +1,4 @@
-from engine.google.mail_handlers import InboundMailHandler
+from mail_handlers import InboundMailHandler
 from models.rawmail import RawMail
 from models.post import Post
 from models.slug import Slug

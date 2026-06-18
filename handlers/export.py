@@ -1,8 +1,10 @@
-import webapp2, time, zipfile, re, datetime, logging, json, filestore, io
+import webapp2, zipfile, datetime, logging, json, filestore, io
 from models.post import Post
 from models.userimage import UserImage
 from models.exporttask import ExportTask
-from engine.google import ndb, blobstore_handlers, taskqueue
+from google.appengine.ext import ndb
+import blobstore_handlers
+from google.appengine.api import taskqueue
 
 class ExportStartHandler(webapp2.RequestHandler):
 	def post(self):
@@ -10,9 +12,9 @@ class ExportStartHandler(webapp2.RequestHandler):
 		task.put()
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/export/run', params={"task":task.key.urlsafe_str()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/export/run', params={"task":task.key.urlsafe().decode()}, retry_options=retry_options)
 		queue_task.add()
-		result = {"message" : "Waiting for task to start..", "id" : task.key.urlsafe_str()}
+		result = {"message" : "Waiting for task to start..", "id" : task.key.urlsafe().decode()}
 		self.response.headers['Content-Type'] = "application/json"
 		self.response.write(json.dumps(result))
 
@@ -74,7 +76,7 @@ class ExportHandler(webapp2.RequestHandler):
 		timestamp = datetime.datetime.now() + datetime.timedelta(minutes=15)
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/export/delete', eta=timestamp, params={"task":export_task.key.urlsafe_str()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/export/delete', eta=timestamp, params={"task":export_task.key.urlsafe().decode()}, retry_options=retry_options)
 		queue_task.add()		
 
 	def cleanup_old_export_tasks(self):

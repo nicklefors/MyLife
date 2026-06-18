@@ -4,7 +4,7 @@ from models.post import Post
 from models.postcounter import PostCounter
 from models.userimage import UserImage
 from models.rawmail import RawMail
-from engine.google import blobstore_handlers
+import blobstore_handlers
 
 	
 class GetPhotoUploadUrlHandler(webapp2.RequestHandler):

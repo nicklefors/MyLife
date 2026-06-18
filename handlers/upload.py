@@ -1,9 +1,11 @@
-import webapp2, time, logging, json, zipfile, datetime, re, traceback, filestore, io
+import webapp2, logging, json, zipfile, datetime, re, traceback, filestore, io
 from models.post import Post
 from models.importtask import ImportTask
 from models.userimage import UserImage
 from models.postcounter import PostCounter
-from engine.google import ndb, blobstore_handlers, taskqueue
+from google.appengine.ext import ndb
+import blobstore_handlers
+from google.appengine.api import taskqueue
 from errorhandling import log_error
 
 class UploadFinishedHandler(blobstore_handlers.BlobstoreUploadHandler):
@@ -19,9 +21,9 @@ class UploadFinishedHandler(blobstore_handlers.BlobstoreUploadHandler):
 		task.put()
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/import', params={"task":task.key.urlsafe_str()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/import', params={"task":task.key.urlsafe().decode()}, retry_options=retry_options)
 		queue_task.add()
-		result = {"message" : "Upload finished, starting import...", "id" : task.key.urlsafe_str()}
+		result = {"message" : "Upload finished, starting import...", "id" : task.key.urlsafe().decode()}
 		self.response.headers['Content-Type'] = "application/json"
 		self.response.write(json.dumps(result))
 

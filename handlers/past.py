@@ -2,7 +2,7 @@ import webapp2, datetime, logging
 from templates import get_template
 from models.post import Post
 from models.postcounter import PostCounter, Month
-from engine.google import ndb
+from google.appengine.ext import ndb
 from models.settings import Settings
 
 class PastHandler(webapp2.RequestHandler):

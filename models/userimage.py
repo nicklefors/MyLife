@@ -1,5 +1,6 @@
 import datetime, logging, re, filestore
-from engine.google import ndb, blobstore, images
+from google.appengine.ext import ndb, blobstore
+from google.appengine.api import images
 
 class UserImage(ndb.Model):
 	original_size_key = ndb.StringProperty()
