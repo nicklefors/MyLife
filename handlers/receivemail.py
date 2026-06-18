@@ -163,9 +163,10 @@ class ReceiveMailHandler(InboundMailHandler):
 				if post.images is None:
 					post.images = []
 
-				bytes = encoded_payload.payload
-				if encoded_payload.encoding:
-					bytes = bytes.decode(encoded_payload.encoding)
+				# EncodedPayload.decode() applies the transfer encoding (e.g. base64)
+				# via codecs and returns the raw image bytes. The old py2 form
+				# (payload.decode(encoding)) raises LookupError on base64 under py3.
+				bytes = encoded_payload.decode()
 
 				post.has_images = True
 				user_image = UserImage()
