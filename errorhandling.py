@@ -1,5 +1,5 @@
 import logging
-from google.appengine.api import mail
+from engine.google import mail
 from google.appengine.api import app_identity
 from models.settings import Settings
 

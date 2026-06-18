@@ -1,6 +1,6 @@
 import cloudstorage
 from google.appengine.api import app_identity
-from google.appengine.ext import blobstore
+from engine.google import blobstore
 
 
 def _bucket_name():

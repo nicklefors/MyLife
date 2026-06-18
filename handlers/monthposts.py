@@ -5,9 +5,9 @@ from models.postcounter import PostCounter
 
 class MonthPostsHandler(webapp2.RequestHandler):
 	def get(self, year, month):
-		from = datetime.date(int(year), int(month), 1)
+		from_date = datetime.date(int(year), int(month), 1)
 
-		posts = Post.query(Post.date < date).order(-Post.date).fetch(1)
+		posts = Post.query(Post.date < from_date).order(-Post.date).fetch(1)
 
 		result = {
 			"year" : year,

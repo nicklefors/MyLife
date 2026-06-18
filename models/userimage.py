@@ -1,6 +1,5 @@
 import datetime, logging, re, filestore
-from google.appengine.ext import ndb, blobstore
-from google.appengine.api import images
+from engine.google import ndb, blobstore, images
 
 class UserImage(ndb.Model):
 	original_size_key = ndb.StringProperty()
@@ -64,7 +63,7 @@ class UserImage(ndb.Model):
 	def get_small_image_name(self, filename):
 		return filename[:-4] + '-small' + filename[-4:]
 
-	def import_image(self, filename, original_filename, bytes, date, email_attachment_content_id):
+	def import_image(self, filename, original_filename, bytes, date, email_attachment_content_id=None):
 
 		content_type = self.get_content_type(original_filename)
 		self.original_size_key = filename

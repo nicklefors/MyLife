@@ -4,8 +4,7 @@ from models.post import Post
 from models.postcounter import PostCounter
 from models.userimage import UserImage
 from models.rawmail import RawMail
-from google.appengine.ext.webapp import blobstore_handlers
-from google.appengine.api import app_identity
+from engine.google import blobstore_handlers
 
 	
 class GetPhotoUploadUrlHandler(webapp2.RequestHandler):

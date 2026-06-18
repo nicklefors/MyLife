@@ -2,7 +2,7 @@ import webapp2, datetime, logging
 from templates import get_template
 from models.post import Post
 from models.postcounter import PostCounter, Month
-from google.appengine.ext import ndb
+from engine.google import ndb
 from models.settings import Settings
 
 class PastHandler(webapp2.RequestHandler):
@@ -33,13 +33,7 @@ class PastHandler(webapp2.RequestHandler):
 		
 		#Get month list
 		months = PostCounter.get().months[:]
-		def cmp_months(a,b):
-			if a.year != b.year:
-				return cmp(a.year, b.year)
-			else:
-				return cmp(a.month, b.month)
-
-		months.sort(cmp_months)
+		months.sort(key=lambda m: (m.year, m.month))
 
 		archive = []
 

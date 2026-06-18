@@ -1,6 +1,6 @@
 import webapp2, datetime, json
 from models.post import Post
-from google.appengine.ext import ndb
+from engine.google import ndb
 
 
 class PostDatesHandler(webapp2.RequestHandler):

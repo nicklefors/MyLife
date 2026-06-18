@@ -3,18 +3,18 @@ from models.post import Post
 
 JINJA_ENVIRONMENT = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
-    extensions=['jinja2.ext.autoescape'],
     autoescape=True)
 
 def get_template(name):
 	return JINJA_ENVIRONMENT.get_template(name)
 
 import re
-from jinja2 import evalcontextfilter, Markup, escape
+from jinja2 import pass_eval_context
+from markupsafe import Markup, escape
 
 _paragraph_re = re.compile(r'(?:\r\n|\r|\n){2,}')
 
-@evalcontextfilter
+@pass_eval_context
 def nl2br(eval_ctx, value):
     result = u'\n\n'.join(u'<p>%s</p>' % p.replace('\n', '<br>\n')
                           for p in _paragraph_re.split(escape(value)))
@@ -24,7 +24,7 @@ def nl2br(eval_ctx, value):
         result = Markup(result)
     return result	
 
-@evalcontextfilter
+@pass_eval_context
 def img2tags(eval_ctx, value):
     import re
     result = re.sub(r'\$IMG:([0-9a-zA-Z\.-]+)', '<a href="/image/\\1?fullsize=1" target="_blank"><img src="/image/\\1"/></a>', value)

@@ -1,5 +1,5 @@
 import datetime
-from google.appengine.ext import ndb
+from engine.google import ndb
 
 
 class ExportTask(ndb.Model):

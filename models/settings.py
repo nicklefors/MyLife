@@ -1,5 +1,5 @@
 import datetime
-from google.appengine.ext import ndb
+from engine.google import ndb
 from models.timezones import timezones
 from google.appengine.api import users
 
@@ -13,14 +13,14 @@ class Settings(ndb.Model):
 	blobstore_migration_done=ndb.BooleanProperty(default=False)
 	
 	@classmethod
- 	def get(cls):
- 		settings = cls.query().get() or Settings()
+	def get(cls):
+		settings = cls.query().get() or Settings()
 
- 		if not settings.email_address:
- 			#If the user is logged in we'll save his email address...
- 			user = users.get_current_user()
- 			if user:
- 				settings.email_address = user.email()
- 				settings.put()
+		if not settings.email_address:
+			#If the user is logged in we'll save his email address...
+			user = users.get_current_user()
+			if user:
+				settings.email_address = user.email()
+				settings.put()
 
- 		return settings
+		return settings

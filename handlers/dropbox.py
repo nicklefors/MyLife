@@ -1,17 +1,13 @@
-from google.appengine.ext.webapp.mail_handlers import InboundMailHandler
-from google.appengine.runtime import apiproxy_errors
-from google.appengine.ext import ndb
+from engine.google import apiproxy_errors
 from models.rawmail import RawMail
 from models.post import Post
 from models.settings import Settings
 from models.userimage import UserImage
 from models.slug import Slug
-from models.userimage import UserImage
 from models.postcounter import PostCounter
-import re, logging, exceptions, traceback, webapp2, json, datetime, filestore
+import re, logging, traceback, webapp2, json, datetime, filestore, io
+import requests
 from errorhandling import log_error
-from google.appengine.api import urlfetch
-from StringIO import StringIO
 
 class DropboxBackupHandler(webapp2.RequestHandler):
 	def get(self):
@@ -29,7 +25,7 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 			posts = [p for p in Post.query().order(Post.date).fetch()]
 
 			self.log('Backing up %s posts to Dropbox' % len(posts))
-			post_text = StringIO()
+			post_text = io.StringIO()
 			for p in posts:
 				post_text.write(p.date.strftime('%Y-%m-%d'))
 				post_text.write('\r\n\r\n')
@@ -74,12 +70,12 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 			settings.dropbox_last_backup = datetime.datetime.now()
 			settings.put()
 			self.log('Finished backup successfully')
-		except apiproxy_errors.OverQuotaError, ex:
+		except apiproxy_errors.OverQuotaError as ex:
 			self.log(ex)
 			log_error('Error backing up to Dropbox, quota exceeded', 'The backup operation did not complete because it ran out of quota. ' +
 				'The next time it runs it will continue backing up your posts and images.' +
 				'%s images out of %s were backed up before failing' % (images_backed_up, images_total))
-		except Exception, ex:
+		except Exception as ex:
 			self.log('Failed to backup posts and images to dropbox: %s' % traceback.format_exc(6))
 			logging.exception("message")
 			self.log('ERROR: %s' % ex)
@@ -104,17 +100,16 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 		    "include_has_explicit_shared_members": False
 		}
 
-		result = urlfetch.fetch(
-			payload=json.dumps(data),
-			method=urlfetch.POST,
-			url='https://api.dropboxapi.com/2/files/get_metadata',
+		result = requests.post(
+			'https://api.dropboxapi.com/2/files/get_metadata',
+			data=json.dumps(data),
 			headers=headers
 		)
 
 		if result.status_code != 200:
-			raise Exception("Failed to get file metadata from Dropbox. Status: %s, body: %s" % (result.status_code, result.content))
-		self.log(result.content)
-		return json.loads(result.content)
+			raise Exception("Failed to get file metadata from Dropbox. Status: %s, body: %s" % (result.status_code, result.text))
+		self.log(result.text)
+		return result.json()
 
 
 	def put_file(self, access_token, name, bytes):
@@ -135,17 +130,16 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 			'Dropbox-API-Arg' : json.dumps(dropbox_args)
 		}
 
-		result = urlfetch.fetch(
-			payload=bytes,
-			method=urlfetch.POST,
-			url='https://content.dropboxapi.com/2/files/upload',
+		result = requests.post(
+			'https://content.dropboxapi.com/2/files/upload',
+			data=bytes,
 			headers=headers
 		)
 
 		if result.status_code != 200:
-			self.log(result.content)
-			raise Exception("Failed to send file to Dropbox. Status: %s, body: %s" % (result.status_code, result.content))
-		return json.loads(result.content)
+			self.log(result.text)
+			raise Exception("Failed to send file to Dropbox. Status: %s, body: %s" % (result.status_code, result.text))
+		return result.json()
 
 
 	def get_dropbox_filelist(self, access_token):
@@ -164,32 +158,30 @@ class DropboxBackupHandler(webapp2.RequestHandler):
 			"limit" : 1000
 		}
 
-		result = urlfetch.fetch(
-			payload=json.dumps(data),
-			method=urlfetch.POST,			
-			url='https://api.dropboxapi.com/2/files/list_folder',
-    		headers=headers)
+		result = requests.post(
+			'https://api.dropboxapi.com/2/files/list_folder',
+			data=json.dumps(data),
+			headers=headers)
 
 		if result.status_code != 200:
-			raise Exception("Failed to get files from Dropbox. Status: %s, body: %s" % (result.status_code, result.content))
-		
-		json_data = json.loads(result.content)
+			raise Exception("Failed to get files from Dropbox. Status: %s, body: %s" % (result.status_code, result.text))
+
+		json_data = result.json()
 		file_list = [o['name'] for o in json_data['entries']]
 
 		#Get everything
 		while json_data['has_more']:
 			self.log('Getting next batch...')
-			result = urlfetch.fetch(
-				payload=json.dumps({"cursor" : json_data['cursor']}),
-				method=urlfetch.POST,			
-				url='https://api.dropboxapi.com/2/files/list_folder/continue',
-	    		headers=headers)
+			result = requests.post(
+				'https://api.dropboxapi.com/2/files/list_folder/continue',
+				data=json.dumps({"cursor" : json_data['cursor']}),
+				headers=headers)
 
 			if result.status_code != 200:
-				raise Exception("Failed to get files from Dropbox. Status: %s, body: %s" % (result.status_code, result.content))
+				raise Exception("Failed to get files from Dropbox. Status: %s, body: %s" % (result.status_code, result.text))
 
-			json_data = json.loads(result.content)
+			json_data = result.json()
 			file_list.extend([o['name'] for o in json_data['entries']])
 
-		return file_list	
+		return file_list
 

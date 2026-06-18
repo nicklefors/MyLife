@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import webapp2, logging
+from google.appengine.api import wrap_wsgi_app
 from templates import get_template
 
 from handlers.calendar import CalendarHandler
@@ -46,4 +47,8 @@ app = webapp2.WSGIApplication([
 	(r'/upload-finished', UploadFinishedHandler),
 	ReceiveMailHandler.mapping()
 ], debug=True)
+
+# Wrap the WSGI app so the legacy bundled-services APIs (ndb, mail, taskqueue,
+# blobstore, images, ...) keep working on the python3 (gen2) runtime.
+app = wrap_wsgi_app(app)
 

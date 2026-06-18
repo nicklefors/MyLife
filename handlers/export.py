@@ -1,12 +1,8 @@
-from __future__ import with_statement
-import webapp2, time, zipfile, re, datetime, logging, json, filestore
-from StringIO import StringIO
+import webapp2, time, zipfile, re, datetime, logging, json, filestore, io
 from models.post import Post
 from models.userimage import UserImage
 from models.exporttask import ExportTask
-from google.appengine.ext import ndb
-from google.appengine.ext.webapp import blobstore_handlers
-from google.appengine.api import taskqueue
+from engine.google import ndb, blobstore_handlers, taskqueue
 
 class ExportStartHandler(webapp2.RequestHandler):
 	def post(self):
@@ -14,9 +10,9 @@ class ExportStartHandler(webapp2.RequestHandler):
 		task.put()
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/export/run', params={"task":task.key.urlsafe()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/export/run', params={"task":task.key.urlsafe_str()}, retry_options=retry_options)
 		queue_task.add()
-		result = {"message" : "Waiting for task to start..", "id" : task.key.urlsafe()}
+		result = {"message" : "Waiting for task to start..", "id" : task.key.urlsafe_str()}
 		self.response.headers['Content-Type'] = "application/json"
 		self.response.write(json.dumps(result))
 
@@ -33,7 +29,7 @@ class ExportHandler(webapp2.RequestHandler):
 
 			self.cleanup_old_export_tasks()
 
-			buffer = StringIO()
+			buffer = io.BytesIO()
 			archive = zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED)
 
 			self.add_posts_to_zip(export_task, archive, day_string)
@@ -48,11 +44,11 @@ class ExportHandler(webapp2.RequestHandler):
 
 			self.enqueue_for_deletion(export_task)
 
-		except Exception, ex:
+		except Exception as ex:
 
 			export_task.update('Failed to export: %s' % ex, status='failed')
-		
-			logging.error('Failed export: %s' % ex.message)
+
+			logging.error('Failed export: %s' % str(ex))
 
 
 	def add_posts_to_zip(self, export_task, archive, day_string):
@@ -78,7 +74,7 @@ class ExportHandler(webapp2.RequestHandler):
 		timestamp = datetime.datetime.now() + datetime.timedelta(minutes=15)
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/export/delete', eta=timestamp, params={"task":export_task.key.urlsafe()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/export/delete', eta=timestamp, params={"task":export_task.key.urlsafe_str()}, retry_options=retry_options)
 		queue_task.add()		
 
 	def cleanup_old_export_tasks(self):
@@ -124,14 +120,13 @@ class ExportStatusHandler(webapp2.RequestHandler):
 		self.response.write(json.dumps(result))
 
 class ExportDownloadHandler(blobstore_handlers.BlobstoreDownloadHandler):
-    def get(self, filename):
+	def get(self, filename):
 
-    	export = ExportTask.query(UserImage.filename == filename).get()
-    	
+		export = ExportTask.query(ExportTask.filename == filename).get()
 
-        if not export:
-            self.error(404)
-        else:
+		if not export:
+			self.error(404)
+		else:
 			self.send_blob(filestore.get_blob_key(export.filename))
 
 class ExportDeleteHandler(webapp2.RequestHandler):

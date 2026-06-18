@@ -131,7 +131,7 @@ class GCSFileStat(object):
     self.metadata = metadata
 
     if not is_dir:
-      self.st_size = long(st_size)
+      self.st_size = int(st_size)
       self.st_ctime = float(st_ctime)
       if etag[0] == '"' and etag[-1] == '"':
         etag = etag[1:-1]
@@ -153,16 +153,34 @@ class GCSFileStat(object):
              content_type=self.content_type,
              metadata=self.metadata))
 
-  def __cmp__(self, other):
+  def _check_comparable(self, other):
     if not isinstance(other, self.__class__):
-      raise ValueError('Argument to cmp must have the same type. '
-                       'Expect %s, got %s', self.__class__.__name__,
-                       other.__class__.__name__)
-    if self.filename > other.filename:
-      return 1
-    elif self.filename < other.filename:
-      return -1
-    return 0
+      raise ValueError('Argument to comparison must have the same type. '
+                       'Expect %s, got %s' % (self.__class__.__name__,
+                                              other.__class__.__name__))
+
+  def __eq__(self, other):
+    self._check_comparable(other)
+    return self.filename == other.filename
+
+  def __lt__(self, other):
+    self._check_comparable(other)
+    return self.filename < other.filename
+
+  def __gt__(self, other):
+    self._check_comparable(other)
+    return self.filename > other.filename
+
+  def __le__(self, other):
+    self._check_comparable(other)
+    return self.filename <= other.filename
+
+  def __ge__(self, other):
+    self._check_comparable(other)
+    return self.filename >= other.filename
+
+  def __ne__(self, other):
+    return not self.__eq__(other)
 
   def __hash__(self):
     if self.etag:
@@ -194,7 +212,7 @@ def get_stored_content_length(headers):
 
 def get_metadata(headers):
   """Get user defined options from HTTP response headers."""
-  return dict((k, v) for k, v in headers.iteritems()
+  return dict((k, v) for k, v in headers.items()
               if any(k.lower().startswith(valid) for valid in _GCS_METADATA))
 
 
@@ -282,7 +300,7 @@ def _validate_path(path):
   """
   if not path:
     raise ValueError('Path is empty')
-  if not isinstance(path, basestring):
+  if not isinstance(path, str):
     raise TypeError('Path should be a string but is %s (%s).' %
                     (path.__class__, path))
 
@@ -301,12 +319,12 @@ def validate_options(options):
   if not options:
     return
 
-  for k, v in options.iteritems():
+  for k, v in options.items():
     if not isinstance(k, str):
       raise TypeError('option %r should be a str.' % k)
     if not any(k.lower().startswith(valid) for valid in _GCS_OPTIONS):
       raise ValueError('option %s is not supported.' % k)
-    if not isinstance(v, basestring):
+    if not isinstance(v, str):
       raise TypeError('value %r for option %s should be of type basestring.' %
                       (v, k))
 
