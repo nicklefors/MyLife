@@ -8,13 +8,23 @@
 runtime: python312
 app_engine_apis: true
 
-# py2.7 (gen1) was the web server itself and used threadsafe: true to dispatch
-# concurrent requests onto threads automatically. py3 (gen2) makes us bring our
-# own WSGI server. 2 workers x 8 threads restores thread concurrency cheaply;
-# --timeout 120 keeps long export/import/backup requests from being killed at
-# gunicorn's 30s default; --keep-alive 620 avoids a keepalive race with the
-# nginx sidecar that causes sporadic 502s.
-entrypoint: gunicorn -b :$PORT --timeout 120 --workers 2 --threads 8 --keep-alive 620 main:app
+# Single-user app: keep the footprint minimal so it stays in the App Engine free
+# tier. Smallest instance class (F1, 256MB), and a single gunicorn worker -- a
+# few threads is plenty for one user plus the occasional cron/task request, and
+# 1 worker keeps memory well under F1's limit. --timeout 300 lets long
+# export/import/Dropbox-backup requests finish instead of being killed at
+# gunicorn's 30s default.
+entrypoint: gunicorn -b :$PORT --timeout 300 --workers 1 --threads 4 main:app
+
+instance_class: F1
+
+# Scale to zero when idle (no always-on instance to pay for) and never run more
+# than one instance -- a single user never needs concurrency across instances.
+automatic_scaling:
+  min_instances: 0
+  max_instances: 1
+  min_idle_instances: 0
+  max_idle_instances: 1
 
 inbound_services:
 - mail
