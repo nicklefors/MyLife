@@ -5,12 +5,27 @@
 #
 # where "yourappid" is the actual id of your personal MyLife installation.
 
-runtime: python27
-api_version: 1
-threadsafe: yes
+runtime: python312
+app_engine_apis: true
 
-builtins:
-- remote_api: on
+# Single-user app: keep the footprint minimal so it stays in the App Engine free
+# tier. Smallest instance class (F1, 256MB), and a single gunicorn worker -- a
+# few threads is plenty for one user plus the occasional cron/task request, and
+# 1 worker keeps memory well under F1's limit. --timeout 300 lets long
+# export/import/Dropbox-backup requests finish instead of being killed at
+# gunicorn's 30s default.
+entrypoint: gunicorn -b :$PORT --timeout 300 --workers 1 --threads 4 main:app
+
+instance_class: F1
+
+# Scale to zero when idle (no always-on instance to pay for) and never run more
+# than one instance -- a single user never needs concurrency across instances.
+automatic_scaling:
+  min_instances: 0
+  max_instances: 1
+
+inbound_services:
+- mail
 
 handlers:
 
@@ -28,15 +43,6 @@ handlers:
   secure: always
 
 - url: .*
-  script: main.app
+  script: auto
   login: admin
   secure: always
-
-libraries:
-- name: webapp2
-  version: "2.5.2"
-- name: jinja2
-  version: latest  
-
-inbound_services:
-- mail

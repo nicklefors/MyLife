@@ -1,12 +1,10 @@
-from __future__ import with_statement
-import webapp2, time, logging, json, zipfile, datetime, re, traceback, filestore, json
-from StringIO import StringIO
+import webapp2, logging, json, zipfile, datetime, re, traceback, filestore, io
 from models.post import Post
 from models.importtask import ImportTask
 from models.userimage import UserImage
 from models.postcounter import PostCounter
 from google.appengine.ext import ndb
-from google.appengine.ext.webapp import blobstore_handlers
+import blobstore_handlers
 from google.appengine.api import taskqueue
 from errorhandling import log_error
 
@@ -23,9 +21,9 @@ class UploadFinishedHandler(blobstore_handlers.BlobstoreUploadHandler):
 		task.put()
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/import', params={"task":task.key.urlsafe()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/import', params={"task":task.key.urlsafe().decode()}, retry_options=retry_options)
 		queue_task.add()
-		result = {"message" : "Upload finished, starting import...", "id" : task.key.urlsafe()}
+		result = {"message" : "Upload finished, starting import...", "id" : task.key.urlsafe().decode()}
 		self.response.headers['Content-Type'] = "application/json"
 		self.response.write(json.dumps(result))
 
@@ -56,7 +54,7 @@ class ImportHandler(webapp2.RequestHandler):
 				p = Post(
 					date=date,
 					source='ohlife',
-					text=text.decode('utf-8')
+					text=text
 				)
 
 				p.images = []
@@ -97,7 +95,7 @@ class ImportHandler(webapp2.RequestHandler):
 			import_task.update(msg, status='finished')
 			logging.info(import_task.message)
 			filestore.delete(import_task.uploaded_file)
-		except Exception, ex:
+		except Exception as ex:
 			try:
 				filestore.delete(import_task.uploaded_file)
 			except:
@@ -113,7 +111,7 @@ class ImportHandler(webapp2.RequestHandler):
 	def read_zip_file(self, uploaded_file):
 		zip_data = filestore.read(uploaded_file)
 
-		zip = zipfile.ZipFile(StringIO(zip_data))
+		zip = zipfile.ZipFile(io.BytesIO(zip_data))
 
 		text = None
 		images = {}
@@ -131,7 +129,7 @@ class ImportHandler(webapp2.RequestHandler):
 		if len(other_files) > 0:
 			raise Exception('Got files that we don\'t know how to handle: %s' % ','.join(other_files))
 
-		text = zip.read(text_files[0])
+		text = zip.read(text_files[0]).decode('utf-8')
 
 		for name in image_files:
 			images[re.sub('^/', '', name)] = zip.read(name)
@@ -172,7 +170,7 @@ class ImportHandler(webapp2.RequestHandler):
 		for date, text in new_posts:
 			if date in existing_posts:
 				logging.info('Skipping post for %s, already exists' % date)
- 			else:
+			else:
 				filtered_posts.append((date,text))
 
 		return filtered_posts

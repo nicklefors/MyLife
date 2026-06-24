@@ -33,13 +33,7 @@ class PastHandler(webapp2.RequestHandler):
 		
 		#Get month list
 		months = PostCounter.get().months[:]
-		def cmp_months(a,b):
-			if a.year != b.year:
-				return cmp(a.year, b.year)
-			else:
-				return cmp(a.month, b.month)
-
-		months.sort(cmp_months)
+		months.sort(key=lambda m: (m.year, m.month))
 
 		archive = []
 

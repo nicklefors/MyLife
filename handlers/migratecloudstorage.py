@@ -1,10 +1,9 @@
-from __future__ import with_statement
-import webapp2, time, logging, json, traceback
+import webapp2, logging, json, traceback
 from models.migratetask import MigrateTask
 from models.userimage import UserImage
 from google.appengine.ext import ndb
-from errorhandling import log_error
 from google.appengine.api import taskqueue
+from errorhandling import log_error
 
 class MigrateStartHandler(webapp2.RequestHandler):
 	def post(self):
@@ -13,9 +12,9 @@ class MigrateStartHandler(webapp2.RequestHandler):
 		task.put()
 
 		retry_options = taskqueue.TaskRetryOptions(task_retry_limit=0)
-		queue_task = taskqueue.Task(url='/migrate/run', params={"task":task.key.urlsafe()}, retry_options=retry_options)
+		queue_task = taskqueue.Task(url='/migrate/run', params={"task":task.key.urlsafe().decode()}, retry_options=retry_options)
 		queue_task.add()
-		result = {"message" : "Migration queued and will start in a few seconds...", "id" : task.key.urlsafe()}
+		result = {"message" : "Migration queued and will start in a few seconds...", "id" : task.key.urlsafe().decode()}
 		self.response.headers['Content-Type'] = "application/json"
 		self.response.write(json.dumps(result))
 
@@ -49,7 +48,7 @@ class MigrateHandler(webapp2.RequestHandler):
 			
 			task.update('Finished migrating images. Have a nice day :)', status='finished')
 			logging.info(task.message)
-		except Exception, ex:
+		except Exception as ex:
 			task.update('Failed to migrate: %s' % ex, status='failed')
 			log_error('Failed migrate images', traceback.format_exc(6))
 

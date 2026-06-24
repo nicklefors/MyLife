@@ -36,12 +36,45 @@
 		<input type="radio" name="include-old-entry" value="yes"{%if include_old_post_in_entry%} checked="checked"{%endif%}/ ><span class="radio">Yes</span>
 		<input type="radio" name="include-old-entry" value="no"{%if not include_old_post_in_entry%} checked="checked"{%endif%} /><span class="radio">No</span>
 
-		<label for="dropbox-access-token">Dropbox Access Token</label>
-		<input type="password" name="dropbox-access-token" id="dropbox-accesss-token" value="{{dropbox_access_token}}" />
+		<h4 class="dropbox-heading">Back up to Dropbox (optional)</h4>
 		<p id="dropbox-explanation">
-			If you add a Dropbox Access Token your entries and photos will automatically be backed up to Dropbox every night.
-			You must <a target="_blank" href="http://einaregilsson.com/mylife-backup-to-dropbox/">set up your own Dropbox app to do this.</a>
+			Connect Dropbox and MyLife will automatically back up all your entries and photos
+			there every night. This is a one-time setup.
 		</p>
+
+		{%if dropbox_connected%}
+		<p class="dropbox-status dropbox-connected">&#10003; Connected to Dropbox.{%if dropbox_last_backup%} Last backup: {{dropbox_last_backup.strftime('%Y-%m-%d %H:%M')}} UTC.{%endif%}</p>
+		{%endif%}
+		{%if dropbox_message%}
+		<p class="dropbox-status">{{dropbox_message}}</p>
+		{%endif%}
+
+		<p class="dropbox-steps-heading">Step 1 &mdash; create your Dropbox app</p>
+		<ol class="dropbox-steps">
+			<li>Open the <a target="_blank" href="https://www.dropbox.com/developers/apps">Dropbox App Console</a> and click <strong>Create app</strong>.</li>
+			<li>Choose <strong>Scoped access</strong>, then <strong>App folder</strong> access, and give it any name (for example &ldquo;MyLife backup&rdquo;).</li>
+			<li>Open the app's <strong>Permissions</strong> tab, tick <code>files.content.write</code>, <code>files.content.read</code> and <code>files.metadata.read</code>, then click <strong>Submit</strong>.</li>
+			<li>On the <strong>Settings</strong> tab, copy the <strong>App key</strong> and <strong>App secret</strong> into the boxes below and click <strong>Save settings</strong>.</li>
+		</ol>
+
+		<label for="dropbox-app-key">Dropbox App Key</label>
+		<input type="text" name="dropbox-app-key" id="dropbox-app-key" value="{{dropbox_app_key}}" autocomplete="off" />
+
+		<label for="dropbox-app-secret">Dropbox App Secret</label>
+		<input type="password" name="dropbox-app-secret" id="dropbox-app-secret" value="" autocomplete="off" placeholder="{%if dropbox_secret_set%}(unchanged — leave blank to keep){%else%}paste your app secret{%endif%}" />
+
+		{%if dropbox_authorize_url%}
+		<p class="dropbox-steps-heading">Step 2 &mdash; authorize</p>
+		<ol class="dropbox-steps" start="5">
+			<li><a target="_blank" href="{{dropbox_authorize_url}}">Click here to authorize MyLife with Dropbox</a>, approve access, then copy the code Dropbox shows you.</li>
+			<li>Paste that code in the box below and click <strong>Save settings</strong> again.</li>
+		</ol>
+
+		<label for="dropbox-auth-code">Dropbox Authorization Code</label>
+		<input type="text" name="dropbox-auth-code" id="dropbox-auth-code" value="" autocomplete="off" />
+		{%else%}
+		<p class="dropbox-note">Once you save your app key and secret, a link to finish connecting will appear here.</p>
+		{%endif%}
 		<div class="button-container">
 			<button type="submit" class="save">Save settings</button>
 		</div>

@@ -20,8 +20,6 @@
 
 __all__ = ['add_sync_methods']
 
-import logging
-import os
 import random
 import time
 
@@ -71,7 +69,7 @@ def add_sync_methods(cls):
   Returns:
     The same class, modified in place.
   """
-  for name in cls.__dict__.keys():
+  for name in list(cls.__dict__.keys()):  # py3: snapshot, setattr mutates __dict__
     if name.endswith('_async'):
       sync_name = name[:-6]
       if not hasattr(cls, sync_name):
@@ -98,9 +96,10 @@ def _make_token_async(scopes, service_account_id):
     An ndb.Return with a tuple (token, expiration_time) where expiration_time is
     seconds since the epoch.
   """
-  rpc = app_identity.create_rpc()
-  app_identity.make_get_access_token_call(rpc, scopes, service_account_id)
-  token, expires_at = yield rpc
+  # The async RPC token path (create_rpc + make_get_access_token_call) was
+  # dropped in appengine-python-standard (py3). Use the synchronous
+  # get_access_token; tokens are cached in memcache by the caller anyway.
+  token, expires_at = app_identity.get_access_token(scopes, service_account_id)
   raise ndb.Return((token, expires_at))
 
 
@@ -129,7 +128,7 @@ class _RestApi(object):
         default for current thread will be used.
     """
 
-    if isinstance(scopes, basestring):
+    if isinstance(scopes, str):
       scopes = [scopes]
     self.scopes = scopes
     self.service_account_id = service_account_id
@@ -243,15 +242,7 @@ class _RestApi(object):
     """
     headers = {} if headers is None else dict(headers)
     headers.update(self.user_agent)
-    try:
-      self.token = yield self.get_token_async()
-    except app_identity.InternalError, e:
-      if os.environ.get('DATACENTER', '').endswith('sandman'):
-        self.token = None
-        logging.warning('Could not fetch an authentication token in sandman '
-                     'based Appengine devel setup; proceeding without one.')
-      else:
-        raise e
+    self.token = yield self.get_token_async()
     if self.token:
       headers['authorization'] = 'OAuth ' + self.token
 

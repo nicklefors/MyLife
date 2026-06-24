@@ -20,8 +20,7 @@ from __future__ import with_statement
 
 
 
-__all__ = ['copy2',
-           'delete',
+__all__ = ['delete',
            'listbucket',
            'open',
            'stat',
@@ -29,12 +28,11 @@ __all__ = ['copy2',
           ]
 
 import logging
-import StringIO
-import urllib
+import io
+from urllib import parse as urllib
 import os
 import itertools
-import types
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
 from . import api_utils
 from . import common
 from . import errors
@@ -46,10 +44,10 @@ def open(filename,
          mode='r',
          content_type=None,
          options=None,
+         offset=0,
          read_buffer_size=storage_api.ReadBuffer.DEFAULT_BUFFER_SIZE,
          retry_params=None,
-         _account_id=None,
-         offset=0):
+         _account_id=None):
   """Opens a Google Cloud Storage file and returns it as a File-like object.
 
   Args:
@@ -99,8 +97,8 @@ def open(filename,
                        'for writing mode.')
     return storage_api.ReadBuffer(api,
                                   filename,
-                                  buffer_size=read_buffer_size,
-                                  offset=offset)
+                                  offset=offset,
+                                  buffer_size=read_buffer_size)
   else:
     raise ValueError('Invalid mode %s.' % mode)
 
@@ -160,8 +158,10 @@ def stat(filename, retry_params=None, _account_id=None):
   return file_stat
 
 
-def copy2(src, dst, metadata=None, retry_params=None):
+def _copy2(src, dst, metadata=None, retry_params=None):
   """Copy the file content from src to dst.
+
+  Internal use only!
 
   Args:
     src: /bucket/filename
@@ -279,6 +279,7 @@ def listbucket(path_prefix, marker=None, prefix=None, max_keys=None,
 
   return _Bucket(api, bucket, options)
 
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def compose(list_of_files, destination_file, files_metadata=None,
             content_type=None, retry_params=None, _account_id=None):
   """Runs the GCS Compose on the given files.
@@ -305,9 +306,12 @@ def compose(list_of_files, destination_file, files_metadata=None,
   api = storage_api._get_storage_api(retry_params=retry_params,
                                      account_id=_account_id)
 
+  # Needed until cloudstorage_stub.py is updated to accept compose requests
+  # TODO(rbruyere@gmail.com): When patched remove the True flow from this if.
 
-  if os.getenv('SERVER_SOFTWARE').startswith('Dev'):
+  if (os.getenv('SERVER_SOFTWARE') or '').startswith('Dev'):
     def _temp_func(file_list, destination_file, content_type):
+      """Dev server stub remove when the dev server accepts compose requests."""
       bucket = '/' + destination_file.split('/')[1] + '/'
       with open(destination_file, 'w', content_type=content_type) as gcs_merge:
         for source_file in file_list:
@@ -325,7 +329,6 @@ def compose(list_of_files, destination_file, files_metadata=None,
 
 def _file_exists(destination):
   """Checks if a file exists.
-
   Tries to open the file.
   If it succeeds returns True otherwise False.
 
@@ -360,7 +363,7 @@ def _validate_compose_list(destination_file, file_list,
   common.validate_file_path(destination_file)
   bucket = destination_file[0:(destination_file.index('/', 1) + 1)]
   try:
-    if isinstance(file_list, types.StringTypes):
+    if isinstance(file_list, (str, bytes)):
       raise TypeError
     list_len = len(file_list)
   except TypeError:
@@ -381,25 +384,25 @@ def _validate_compose_list(destination_file, file_list,
                      ' than file_list(%i)'
                      % (len(files_metadata), list_len))
   list_of_files = []
-  for source_file, meta_data in itertools.izip_longest(file_list,
-                                                       files_metadata):
+  for source_file, meta_data in itertools.zip_longest(file_list,
+                                                      files_metadata):
     if not isinstance(source_file, str):
       raise TypeError('Each item of file_list must be a string')
     if source_file.startswith('/'):
-      logging.warn('Detected a "/" at the start of the file, '
-                   'Unless the file name contains a "/" it '
-                   ' may cause files to be misread')
+      logging.warning('Detected a "/" at the start of the file, '
+                      'Unless the file name contains a "/" it '
+                      ' may cause files to be misread')
     if source_file.startswith(bucket):
-      logging.warn('Detected bucket name at the start of the file, '
-                   'must not specify the bucket when listing file_names.'
-                   ' May cause files to be misread')
+      logging.warning('Detected bucket name at the start of the file, '
+                      'must not specify the bucket when listing file_names.'
+                      ' May cause files to be misread')
     common.validate_file_path(bucket + source_file)
 
     list_entry = {}
 
     if meta_data is not None:
       list_entry.update(meta_data)
-    list_entry['Name'] = source_file
+    list_entry["Name"] = source_file
     list_of_files.append(list_entry)
 
   return list_of_files, bucket
@@ -464,24 +467,24 @@ class _Bucket(object):
       root = ET.fromstring(content)
       dirs = self._next_dir_gen(root)
       files = self._next_file_gen(root)
-      next_file = files.next()
-      next_dir = dirs.next()
+      next_file = next(files)
+      next_dir = next(dirs)
 
       while ((max_keys is None or total < max_keys) and
              not (next_file is None and next_dir is None)):
         total += 1
         if next_file is None:
           self._last_yield = next_dir
-          next_dir = dirs.next()
+          next_dir = next(dirs)
         elif next_dir is None:
           self._last_yield = next_file
-          next_file = files.next()
+          next_file = next(files)
         elif next_dir < next_file:
           self._last_yield = next_dir
-          next_dir = dirs.next()
+          next_dir = next(dirs)
         elif next_file < next_dir:
           self._last_yield = next_file
-          next_file = files.next()
+          next_file = next(files)
         else:
           logging.error(
               'Should never reach. next file is %r. next dir is %r.',
@@ -499,9 +502,9 @@ class _Bucket(object):
     Yields:
       GCSFileStat for the next file.
     """
-    for e in root.getiterator(common._T_CONTENTS):
+    for e in root.iter(common._T_CONTENTS):
       st_ctime, size, etag, key = None, None, None, None
-      for child in e.getiterator('*'):
+      for child in e.iter('*'):
         if child.tag == common._T_LAST_MODIFIED:
           st_ctime = common.dt_str_to_posix(child.text)
         elif child.tag == common._T_ETAG:
@@ -524,7 +527,7 @@ class _Bucket(object):
     Yields:
       GCSFileStat for the next directory.
     """
-    for e in root.getiterator(common._T_COMMON_PREFIXES):
+    for e in root.iter(common._T_COMMON_PREFIXES):
       yield common.GCSFileStat(
           self._path + '/' + e.find(common._T_PREFIX).text,
           st_size=None, etag=None, st_ctime=None, is_dir=True)
@@ -573,7 +576,7 @@ class _Bucket(object):
       A dict from element tag to element value.
     """
     element_mapping = {}
-    result = StringIO.StringIO(result)
+    result = io.BytesIO(result if isinstance(result, bytes) else result.encode('utf-8'))
     for _, e in ET.iterparse(result, events=('end',)):
       if not elements:
         break

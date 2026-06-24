@@ -36,11 +36,11 @@ class PostCounter(ndb.Model):
 
 
 	@classmethod
- 	def get(cls):
- 		counter = cls.query().get()
+	def get(cls):
+		counter = cls.query().get()
 
- 		if not counter:
- 			counter = PostCounter(count=0)
- 			counter.put()
+		if not counter:
+			counter = PostCounter(count=0)
+			counter.put()
 
- 		return counter
+		return counter

@@ -1,4 +1,4 @@
-from google.appengine.ext.webapp import blobstore_handlers
+import blobstore_handlers
 import filestore
 from models.userimage import UserImage
 

@@ -21,19 +21,18 @@ __all__ = ['set_default_retry_params',
           ]
 
 import copy
-import httplib
+import http.client as httplib
 import logging
 import math
 import os
 import threading
 import time
-import urllib
+from urllib import parse as urllib
 
 
 try:
   from google.appengine.api import app_identity
   from google.appengine.api import urlfetch
-  from google.appengine.api import urlfetch_errors
   from google.appengine.datastore import datastore_rpc
   from google.appengine.ext import ndb
   from google.appengine.ext.ndb import eventloop
@@ -44,7 +43,6 @@ try:
 except ImportError:
   from google.appengine.api import app_identity
   from google.appengine.api import urlfetch
-  from google.appengine.api import urlfetch_errors
   from google.appengine.datastore import datastore_rpc
   from google.appengine import runtime
   from google.appengine.runtime import apiproxy_errors
@@ -55,7 +53,6 @@ except ImportError:
 
 
 _RETRIABLE_EXCEPTIONS = (urlfetch.DownloadError,
-                         urlfetch_errors.InternalTransientError,
                          apiproxy_errors.Error,
                          app_identity.InternalError,
                          app_identity.BackendDeadlineExceeded)
@@ -170,8 +167,10 @@ class _RetryWrapper(object):
             'Tasklet has exceeded request deadline after %s seconds total',
             time.time() - start_time)
         raise
-      except self.retriable_exceptions, e:
-        pass
+      except self.retriable_exceptions as err:
+        # py3 implicitly deletes the except binding when the clause exits
+        # (PEP 3110), so copy it to keep it visible to the retry logic below.
+        e = err
 
       if n == 1:
         logging.debug('Tasklet is %r', tasklet)

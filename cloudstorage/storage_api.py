@@ -24,7 +24,7 @@ __all__ = ['ReadBuffer',
 
 import collections
 import os
-import urlparse
+from urllib import parse as urlparse
 
 from . import api_utils
 from . import common
@@ -126,7 +126,7 @@ class _StorageApi(rest_api._RestApi):
       resp_tuple = yield super(_StorageApi, self).do_request_async(
           url, method=method, headers=headers, payload=payload,
           deadline=deadline, callback=callback)
-    except urlfetch.DownloadError, e:
+    except urlfetch.DownloadError as e:
       raise errors.TimeoutError(
           'Request to Google Cloud Storage timed out.', e)
 
@@ -169,12 +169,13 @@ class _StorageApi(rest_api._RestApi):
     """GET a bucket."""
     return self.do_request_async(self.api_url + path, 'GET', **kwds)
 
+  # pylint: disable=too-many-locals
   def compose_object(self, file_list, destination_file, content_type):
     """COMPOSE multiple objects together.
 
-    Using the given list of files, calls the put object with the compose flag.
+    Using the given list of files calls the put object with the compose flag.
     This call merges all the files into the destination file.
-
+        
     Args:
       file_list: list of dicts with the file name.
       destination_file: Path to the destination file.
@@ -185,7 +186,7 @@ class _StorageApi(rest_api._RestApi):
 
     for meta_data in file_list:
       xml_setting_list.append('<Component>')
-      for key, val in meta_data.iteritems():
+      for key, val in meta_data.items():
         xml_setting_list.append('<%s>%s</%s>' % (key, val, key))
       xml_setting_list.append('</Component>')
     xml_setting_list.append('</ComposeRequest>')
@@ -195,12 +196,12 @@ class _StorageApi(rest_api._RestApi):
       headers = {'Content-Type': content_type}
     else:
       headers = None
+    # pylint: disable=no-member
     status, resp_headers, content = self.put_object(
         api_utils._quote_filename(destination_file) + '?compose',
         payload=xml,
         headers=headers)
-    errors.check_status(status, [200], destination_file, resp_headers,
-                        body=content)
+    errors.check_status(status, [200], destination_file, resp_headers, body=content)
 
 
 _StorageApi = rest_api.add_sync_methods(_StorageApi)
@@ -215,9 +216,9 @@ class ReadBuffer(object):
   def __init__(self,
                api,
                path,
+               offset=0,
                buffer_size=DEFAULT_BUFFER_SIZE,
-               max_request_size=MAX_REQUEST_SIZE,
-               offset=0):
+               max_request_size=MAX_REQUEST_SIZE):
     """Constructor.
 
     Args:
@@ -239,7 +240,6 @@ class ReadBuffer(object):
     self._buffer_size = buffer_size
     self._max_request_size = max_request_size
     self._offset = offset
-
     self._buffer = _Buffer()
     self._etag = None
 
@@ -247,7 +247,7 @@ class ReadBuffer(object):
 
     status, headers, content = self._api.head_object(path)
     errors.check_status(status, [200], path, resp_headers=headers, body=content)
-    self._file_size = long(common.get_stored_content_length(headers))
+    self._file_size = int(common.get_stored_content_length(headers))
     self._check_etag(headers.get('etag'))
 
     self._buffer_future = None
@@ -314,11 +314,13 @@ class ReadBuffer(object):
     """
     return self
 
-  def next(self):
+  def __next__(self):
     line = self.readline()
     if not line:
       raise StopIteration()
     return line
+
+  next = __next__
 
   def readline(self, size=-1):
     """Read one line delimited by '\n' from the file.
@@ -341,7 +343,7 @@ class ReadBuffer(object):
     """
     self._check_open()
     if size == 0 or not self._remaining():
-      return ''
+      return b''
 
     data_list = []
     newline_offset = self._buffer.find_newline(size)
@@ -351,7 +353,7 @@ class ReadBuffer(object):
       self._offset += len(data)
       data_list.append(data)
       if size == 0 or not self._remaining():
-        return ''.join(data_list)
+        return b''.join(data_list)
       self._buffer.reset(self._buffer_future.get_result())
       self._request_next_buffer()
       newline_offset = self._buffer.find_newline(size)
@@ -360,7 +362,7 @@ class ReadBuffer(object):
     self._offset += len(data)
     data_list.append(data)
 
-    return ''.join(data_list)
+    return b''.join(data_list)
 
   def read(self, size=-1):
     """Read data from RAW file.
@@ -378,7 +380,7 @@ class ReadBuffer(object):
     """
     self._check_open()
     if not self._remaining():
-      return ''
+      return b''
 
     data_list = []
     while True:
@@ -407,7 +409,7 @@ class ReadBuffer(object):
 
     if self._buffer_future is None:
       self._request_next_buffer()
-    return ''.join(data_list)
+    return b''.join(data_list)
 
   def _remaining(self):
     return self._file_size - self._offset
@@ -590,7 +592,7 @@ class _Buffer(object):
   def __init__(self):
     self.reset()
 
-  def reset(self, content='', offset=0):
+  def reset(self, content=b'', offset=0):
     self._buffer = content
     self._offset = offset
 
@@ -637,8 +639,8 @@ class _Buffer(object):
       offset of newline char in buffer. -1 if doesn't exist.
     """
     if size < 0:
-      return self._buffer.find('\n', self._offset)
-    return self._buffer.find('\n', self._offset, self._offset + size)
+      return self._buffer.find(b'\n', self._offset)
+    return self._buffer.find(b'\n', self._offset, self._offset + size)
 
 
 class StreamingBuffer(object):
@@ -744,14 +746,18 @@ class StreamingBuffer(object):
     """Write some bytes.
 
     Args:
-      data: data to write. str.
+      data: data to write. bytes or str (str is encoded as utf-8).
 
     Raises:
-      TypeError: if data is not of type str.
+      TypeError: if data is not bytes or str.
     """
     self._check_open()
-    if not isinstance(data, str):
-      raise TypeError('Expected str but got %s.' % type(data))
+    if isinstance(data, str):
+      data = data.encode('utf-8')
+    elif isinstance(data, bytearray):
+      data = bytes(data)
+    elif not isinstance(data, bytes):
+      raise TypeError('Expected bytes or str but got %s.' % type(data))
     if not data:
       return
     self._buffer.append(data)
@@ -834,7 +840,7 @@ class StreamingBuffer(object):
           tmp_buffer.append(head)
           tmp_buffer_len += len(head)
 
-      data = ''.join(tmp_buffer)
+      data = b''.join(tmp_buffer)
       file_len = '*'
       if finish and not self._buffered:
         file_len = self._written + len(data)
